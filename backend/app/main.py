@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 import logging
+import os
 
 import joblib
 import shap
@@ -12,6 +13,20 @@ from slowapi.util import get_remote_address
 
 from app.config import settings
 from app.logging_config import configure_logging
+
+# LangChain/LangSmith reads tracing configuration directly from os.environ
+# (not from Pydantic Settings). We export the relevant vars here so they are
+# available regardless of how the process was started (uvicorn, docker, etc.).
+_LANGCHAIN_ENV_VARS = [
+    "LANGCHAIN_TRACING_V2",
+    "LANGSMITH_API_KEY",
+    "LANGSMITH_ENDPOINT",
+    "LANGCHAIN_PROJECT",
+]
+for _var in _LANGCHAIN_ENV_VARS:
+    _val = getattr(settings, _var.lower(), None)
+    if _val and _var not in os.environ:
+        os.environ[_var] = str(_val)
 from app.schema import (
     EmailRequest, EmailResponse,
     PredictRequest, PredictResponse,
