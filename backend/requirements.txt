@@ -11,4 +11,9 @@ joblib==1.4.2
 python-multipart==0.0.20
 python-json-logger==3.2.1
 google-genai
+langgraph
+langchain-core
+langchain-google-genai
+langchain-groq
+slowapi
 pytest

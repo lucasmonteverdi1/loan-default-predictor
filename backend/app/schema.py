@@ -43,3 +43,22 @@ class EmailRequest(BaseModel):
 class EmailResponse(BaseModel):
     subject: str
     body: str
+
+
+class HistogramBin(BaseModel):
+    bin_start: float
+    bin_end: float
+    count: int
+
+
+class PredictionRecord(BaseModel):
+    ts: str
+    prob: float
+    recommendation: Recommendation
+
+
+class StatsResponse(BaseModel):
+    total: int
+    recommendation_counts: dict[str, int]
+    histogram: list[HistogramBin]
+    recent: list[PredictionRecord]
