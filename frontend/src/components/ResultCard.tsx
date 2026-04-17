@@ -1,29 +1,14 @@
 import { useState } from "react";
 import type { PredictResponse, EmailResponse } from "../api";
+import { toReadable } from "../featureLabels";
 
 type Recommendation = PredictResponse["recommendation"];
 
 const BADGE: Record<Recommendation, { bg: string; text: string; label: string }> = {
-  APPROVED: {
-    bg: "bg-green-100",
-    text: "text-green-800",
-    label: "✓ Approved",
-  },
-  CONDITIONAL: {
-    bg: "bg-yellow-100",
-    text: "text-yellow-800",
-    label: "⚠ Conditional",
-  },
-  REVIEW_NEEDED: {
-    bg: "bg-orange-100",
-    text: "text-orange-800",
-    label: "⟳ Review needed",
-  },
-  REJECTED: {
-    bg: "bg-red-100",
-    text: "text-red-800",
-    label: "✕ Rejected",
-  },
+  APPROVED: { bg: "bg-green-100", text: "text-green-800", label: "✓ Approved" },
+  CONDITIONAL: { bg: "bg-yellow-100", text: "text-yellow-800", label: "⚠ Conditional" },
+  REVIEW_NEEDED: { bg: "bg-orange-100", text: "text-orange-800", label: "⟳ Review needed" },
+  REJECTED: { bg: "bg-red-100", text: "text-red-800", label: "✕ Rejected" },
 };
 
 interface Props {
@@ -48,16 +33,12 @@ export default function ResultCard({ prediction, email, emailLoading }: Props) {
       {/* Decision */}
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <span
-            className={`rounded-full px-3 py-1 text-sm font-semibold ${badge.bg} ${badge.text}`}
-          >
+          <span className={`rounded-full px-3 py-1 text-sm font-semibold ${badge.bg} ${badge.text}`}>
             {badge.label}
           </span>
           <span className="text-2xl font-bold text-gray-900">
             {prediction.default_pct}
-            <span className="ml-1 text-sm font-normal text-gray-500">
-              default probability
-            </span>
+            <span className="ml-1 text-sm font-normal text-gray-500">default probability</span>
           </span>
         </div>
 
@@ -69,9 +50,10 @@ export default function ResultCard({ prediction, email, emailLoading }: Props) {
             {prediction.top_risk_factors.map((f) => (
               <span
                 key={f}
-                className="rounded-md bg-gray-100 px-2 py-1 text-xs font-mono text-gray-700"
+                className="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700"
+                title={f} // show technical name on hover
               >
-                {f}
+                {toReadable(f)}
               </span>
             ))}
           </div>
@@ -81,9 +63,7 @@ export default function ResultCard({ prediction, email, emailLoading }: Props) {
       {/* Email */}
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-semibold text-gray-700">
-            📧 Draft email for applicant
-          </p>
+          <p className="text-sm font-semibold text-gray-700">Draft email for applicant</p>
           {email && (
             <button
               onClick={copyEmail}
@@ -105,9 +85,7 @@ export default function ResultCard({ prediction, email, emailLoading }: Props) {
               {email.subject}
             </p>
             <hr className="border-gray-100" />
-            <pre className="whitespace-pre-wrap font-sans leading-relaxed">
-              {email.body}
-            </pre>
+            <pre className="whitespace-pre-wrap font-sans leading-relaxed">{email.body}</pre>
           </div>
         )}
       </div>

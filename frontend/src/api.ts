@@ -46,6 +46,25 @@ export interface EmailResponse {
   body: string;
 }
 
+export interface HistogramBin {
+  bin_start: number;
+  bin_end: number;
+  count: number;
+}
+
+export interface PredictionRecord {
+  ts: string;
+  prob: number;
+  recommendation: Recommendation;
+}
+
+export interface StatsResponse {
+  total: number;
+  recommendation_counts: Record<string, number>;
+  histogram: HistogramBin[];
+  recent: PredictionRecord[];
+}
+
 async function apiFetch<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
@@ -64,3 +83,6 @@ export const predictLoan = (data: PredictRequest): Promise<PredictResponse> =>
 
 export const generateEmail = (data: EmailRequest): Promise<EmailResponse> =>
   apiFetch<EmailResponse>("/email", data);
+
+export const getStats = (): Promise<StatsResponse> =>
+  fetch(`${API_URL}/stats`).then((r) => r.json() as Promise<StatsResponse>);
