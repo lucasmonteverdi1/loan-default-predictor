@@ -19,14 +19,14 @@ interface Props {
 interface Sliders {
   loan_amnt: number;
   loan_int_rate: number;
-  loan_percent_income: number;
+  person_income: number;
 }
 
 export default function WhatIfPanel({ baseValues, baseResult }: Props) {
   const [sliders, setSliders] = useState<Sliders>({
     loan_amnt: baseValues.loan_amnt,
     loan_int_rate: baseValues.loan_int_rate,
-    loan_percent_income: baseValues.loan_percent_income,
+    person_income: baseValues.person_income,
   });
   const [result, setResult] = useState<PredictResponse>(baseResult);
   const [loading, setLoading] = useState(false);
@@ -37,7 +37,7 @@ export default function WhatIfPanel({ baseValues, baseResult }: Props) {
     setSliders({
       loan_amnt: baseValues.loan_amnt,
       loan_int_rate: baseValues.loan_int_rate,
-      loan_percent_income: baseValues.loan_percent_income,
+      person_income: baseValues.person_income,
     });
     setResult(baseResult);
   }, [baseResult, baseValues]);
@@ -56,7 +56,7 @@ export default function WhatIfPanel({ baseValues, baseResult }: Props) {
           ...rest,
           loan_amnt: next.loan_amnt,
           loan_int_rate: next.loan_int_rate,
-          loan_percent_income: next.loan_percent_income,
+          person_income: next.person_income,
         });
         setResult(updated);
       } catch {
@@ -71,7 +71,7 @@ export default function WhatIfPanel({ baseValues, baseResult }: Props) {
     setSliders({
       loan_amnt: baseValues.loan_amnt,
       loan_int_rate: baseValues.loan_int_rate,
-      loan_percent_income: baseValues.loan_percent_income,
+      person_income: baseValues.person_income,
     });
     setResult(baseResult);
   }
@@ -120,14 +120,14 @@ export default function WhatIfPanel({ baseValues, baseResult }: Props) {
           onChange={(v) => handleSliderChange("loan_int_rate", v)}
         />
         <SliderField
-          label="Loan as % of income"
-          value={sliders.loan_percent_income}
-          min={0.01}
-          max={1}
-          step={0.01}
-          format={(v) => `${(v * 100).toFixed(0)}%`}
-          base={baseValues.loan_percent_income}
-          onChange={(v) => handleSliderChange("loan_percent_income", v)}
+          label="Annual income ($)"
+          value={sliders.person_income}
+          min={10000}
+          max={200000}
+          step={5000}
+          format={(v) => `$${v.toLocaleString()}`}
+          base={baseValues.person_income}
+          onChange={(v) => handleSliderChange("person_income", v)}
         />
       </div>
 

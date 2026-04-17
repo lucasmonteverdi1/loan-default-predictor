@@ -21,7 +21,6 @@ export interface PredictRequest {
   loan_grade: LoanGrade;
   loan_amnt: number;
   loan_int_rate: number;
-  loan_percent_income: number;
   cb_person_default_on_file: DefaultOnFile;
   cb_person_cred_hist_length: number;
 }

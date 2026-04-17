@@ -20,7 +20,6 @@ class PredictRequest(BaseModel):
     loan_grade: LoanGrade
     loan_amnt: float = Field(..., gt=0)
     loan_int_rate: float = Field(..., gt=0, le=100)
-    loan_percent_income: float = Field(..., ge=0, le=1)
     cb_person_default_on_file: DefaultOnFile
     cb_person_cred_hist_length: int = Field(..., ge=0)
 
