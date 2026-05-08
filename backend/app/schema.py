@@ -1,5 +1,6 @@
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from app.feature_labels import FEATURE_LABELS
 
 HomeOwnership = Literal["RENT", "OWN", "MORTGAGE", "OTHER"]
 LoanIntent = Literal[
@@ -33,10 +34,25 @@ class PredictResponse(BaseModel):
 
 class EmailRequest(BaseModel):
     recommendation: Recommendation
-    applicant_name: str = Field(..., min_length=1)
+    applicant_name: str = Field(..., min_length=1, max_length=100)
     loan_amnt: float = Field(..., gt=0)
     loan_intent: LoanIntent
-    top_risk_factors: list[str]
+    top_risk_factors: list[str] = Field(..., max_length=10)
+
+    @field_validator("top_risk_factors")
+    @classmethod
+    def factors_must_be_known_features(cls, factors: list[str]) -> list[str]:
+        """Reject factor names that aren't in the model's feature set.
+
+        Prevents arbitrary strings from being interpolated into LLM prompts.
+        """
+        unknown = [f for f in factors if f not in FEATURE_LABELS]
+        if unknown:
+            raise ValueError(
+                f"Unknown feature name(s): {unknown}. "
+                "top_risk_factors must contain valid model feature names."
+            )
+        return factors
 
 
 class EmailResponse(BaseModel):
@@ -57,7 +73,8 @@ class PredictionRecord(BaseModel):
 
 
 class StatsResponse(BaseModel):
-    total: int
+    total: int           # all-time prediction count
+    recent_count: int    # predictions in the ring buffer (≤ 500)
     recommendation_counts: dict[str, int]
     histogram: list[HistogramBin]
     recent: list[PredictionRecord]

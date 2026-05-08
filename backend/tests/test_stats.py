@@ -73,13 +73,14 @@ def test_stats_after_predict(client):
     assert len(data["recent"]) == 1
 
 
-# 3. StatsStore ring buffer caps at maxlen
+# 3. StatsStore ring buffer caps at maxlen, but total is all-time
 def test_ring_buffer_maxlen():
     store = StatsStore(maxlen=3)
     for i in range(5):
         store.record(0.1 * i, "APPROVED")
     snap = store.snapshot()
-    assert snap["total"] == 3  # only last 3 kept
+    assert snap["total"] == 5         # all-time count never decays
+    assert snap["recent_count"] == 3  # ring buffer capped at maxlen
 
 
 # 4. Histogram bins sum to total

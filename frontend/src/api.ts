@@ -58,7 +58,8 @@ export interface PredictionRecord {
 }
 
 export interface StatsResponse {
-  total: number;
+  total: number;        // all-time prediction count
+  recent_count: number; // predictions in the ring buffer (≤ 500)
   recommendation_counts: Record<string, number>;
   histogram: HistogramBin[];
   recent: PredictionRecord[];

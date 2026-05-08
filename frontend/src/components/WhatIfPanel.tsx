@@ -30,6 +30,7 @@ export default function WhatIfPanel({ baseValues, baseResult }: Props) {
   });
   const [result, setResult] = useState<PredictResponse>(baseResult);
   const [loading, setLoading] = useState(false);
+  const [sliderError, setSliderError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset sliders when a new base prediction comes in.
@@ -64,8 +65,11 @@ export default function WhatIfPanel({ baseValues, baseResult }: Props) {
           person_income: next.person_income,
         });
         setResult(updated);
-      } catch {
-        // silently ignore — keep showing last valid result
+        setSliderError(null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Request failed";
+        setSliderError(msg.startsWith("429") ? "Rate limit reached — try again in a moment" : "Recalculation failed");
+        console.error("WhatIfPanel predict error:", err);
       } finally {
         setLoading(false);
       }
@@ -155,6 +159,9 @@ export default function WhatIfPanel({ baseValues, baseResult }: Props) {
         )}
         {loading && (
           <span className="text-xs text-gray-400 animate-pulse">Recalculating…</span>
+        )}
+        {sliderError && !loading && (
+          <span className="text-xs text-red-500">{sliderError}</span>
         )}
       </div>
     </div>

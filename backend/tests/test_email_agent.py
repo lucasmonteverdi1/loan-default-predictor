@@ -94,17 +94,20 @@ def test_generate_email_happy_path():
     }
     fake_validate_output = {"validation_passed": True}
 
-    with patch("app.email_gen.generate_email_node", return_value=fake_generate_output), \
-         patch("app.email_gen.validate_email_node", return_value=fake_validate_output), \
-         patch("app.email_gen.settings") as mock_settings:
-        mock_settings.gemini_api_key = "fake-key"
-        mock_settings.groq_api_key = "fake-groq-key"
+    import app.email_gen as eg
+    original_graph = eg._graph  # save so we can restore after test
 
-        # Re-build the graph with the mocked nodes
-        import app.email_gen as eg
-        eg._graph = eg._build_graph()
+    try:
+        with patch("app.email_gen.generate_email_node", return_value=fake_generate_output), \
+             patch("app.email_gen.validate_email_node", return_value=fake_validate_output), \
+             patch("app.email_gen.settings") as mock_settings:
+            mock_settings.gemini_api_key = "fake-key"
+            mock_settings.groq_api_key = "fake-groq-key"
 
-        result = eg.generate_email(EMAIL_REQUEST)
+            eg._graph = eg._build_graph()
+            result = eg.generate_email(EMAIL_REQUEST)
+    finally:
+        eg._graph = original_graph  # always restore, even if the test fails
 
     assert isinstance(result, EmailResponse)
     assert result.subject == "Good news!"
@@ -126,15 +129,19 @@ def test_generate_email_no_api_key_returns_fallback():
 
 def test_generate_email_llm_exception_returns_fallback():
     """If a node raises unexpectedly, the fallback email is returned (no 500)."""
-    with patch("app.email_gen.generate_email_node", side_effect=RuntimeError("API down")), \
-         patch("app.email_gen.settings") as mock_settings:
-        mock_settings.gemini_api_key = "fake-key"
-        mock_settings.groq_api_key = "fake-groq-key"
+    import app.email_gen as eg
+    original_graph = eg._graph
 
-        import app.email_gen as eg
-        eg._graph = eg._build_graph()
+    try:
+        with patch("app.email_gen.generate_email_node", side_effect=RuntimeError("API down")), \
+             patch("app.email_gen.settings") as mock_settings:
+            mock_settings.gemini_api_key = "fake-key"
+            mock_settings.groq_api_key = "fake-groq-key"
 
-        result = eg.generate_email(EMAIL_REQUEST)
+            eg._graph = eg._build_graph()
+            result = eg.generate_email(EMAIL_REQUEST)
+    finally:
+        eg._graph = original_graph
 
     assert isinstance(result, EmailResponse)
     assert result.subject == "Regarding your loan application"

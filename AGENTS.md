@@ -302,7 +302,7 @@ No behavior change locally; `severity` mapping only matters on GCP.
 
 Two independent jobs on push/PR to `main`:
 - `backend-tests`: Python 3.11, pip cache, `pytest tests/ -v`
-- `frontend-build`: pnpm latest, Node 20, `pnpm install --frozen-lockfile && pnpm run build`
+- `frontend-build`: pnpm latest, Node 22, `pnpm install --frozen-lockfile && pnpm run build`
 
 Tests do not require model files or API keys — all LLM calls and joblib loads are mocked.
 

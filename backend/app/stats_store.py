@@ -28,7 +28,8 @@ class PredictionRecord(TypedDict):
 
 
 class StatsSnapshot(TypedDict):
-    total: int
+    total: int          # all-time prediction count (does not reset with the ring buffer)
+    recent_count: int   # predictions currently in the ring buffer (≤ maxlen)
     recommendation_counts: dict[str, int]
     histogram: list[dict[str, float | int]]
     recent: list[PredictionRecord]
@@ -46,11 +47,17 @@ def _bucket(prob: float) -> int:
 
 
 class StatsStore:
-    """Thread-safe ring buffer of recent predictions."""
+    """Thread-safe ring buffer of recent predictions.
+
+    _total_seen tracks the all-time count and never resets, while _buf caps at
+    maxlen so memory stays bounded. The dashboard shows _total_seen as "Total
+    predictions" — it's accurate even after the buffer rolls over.
+    """
 
     def __init__(self, maxlen: int = 500):
         self._buf: deque[PredictionRecord] = deque(maxlen=maxlen)
         self._lock = Lock()
+        self._total_seen: int = 0
 
     def record(self, prob: float, recommendation: str) -> None:
         record: PredictionRecord = {
@@ -60,6 +67,7 @@ class StatsStore:
         }
         with self._lock:
             self._buf.append(record)
+            self._total_seen += 1
 
     def snapshot(self) -> StatsSnapshot:
         with self._lock:
@@ -83,16 +91,18 @@ class StatsStore:
         recent = items[-20:][::-1]  # newest first
 
         return {
-            "total": len(items),
+            "total": self._total_seen,
+            "recent_count": len(items),
             "recommendation_counts": dict(rec_counts),
             "histogram": histogram,
             "recent": recent,
         }
 
     def clear(self) -> None:
-        """Reset the buffer. Only used by tests."""
+        """Reset the buffer and counter. Only used by tests."""
         with self._lock:
             self._buf.clear()
+            self._total_seen = 0
 
 
 # Module-level singleton used by predict.py and main.py.

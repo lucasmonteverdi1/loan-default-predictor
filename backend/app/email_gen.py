@@ -22,6 +22,43 @@ from app.schema import EmailRequest, EmailResponse
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# LLM client singletons — instantiated once at module load, reused per request.
+# Creating ChatGoogleGenerativeAI / ChatGroq on every call adds unnecessary
+# overhead (client setup, auth validation). Both clients are stateless and
+# safe to share across requests.
+# ---------------------------------------------------------------------------
+
+def _make_gemini_client() -> ChatGoogleGenerativeAI:
+    return ChatGoogleGenerativeAI(
+        model=settings.gemini_model,
+        google_api_key=settings.gemini_api_key,
+        temperature=0.7,
+    )
+
+def _make_groq_client() -> ChatGroq:
+    return ChatGroq(
+        model=settings.groq_model,
+        api_key=settings.groq_api_key,
+        temperature=0.0,
+    )
+
+# Lazy singletons: only created when both keys are present (checked in generate_email).
+_gemini_llm: ChatGoogleGenerativeAI | None = None
+_groq_llm: ChatGroq | None = None
+
+def _get_gemini() -> ChatGoogleGenerativeAI:
+    global _gemini_llm
+    if _gemini_llm is None:
+        _gemini_llm = _make_gemini_client()
+    return _gemini_llm
+
+def _get_groq() -> ChatGroq:
+    global _groq_llm
+    if _groq_llm is None:
+        _groq_llm = _make_groq_client()
+    return _groq_llm
+
+# ---------------------------------------------------------------------------
 # Tone mapping: one style guide per recommendation outcome.
 # ---------------------------------------------------------------------------
 _TONE_MAP: dict[str, str] = {
@@ -110,12 +147,7 @@ def generate_email_node(state: EmailState) -> dict:
     prompt is focused. Returns subject + body as raw strings.
     Position in graph: after choose_tone; may be called again on retry.
     """
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
-        temperature=0.7,
-    )
-
+    llm = _get_gemini()
     intent_label = _INTENT_LABELS.get(state["loan_intent"], state["loan_intent"].lower())
     factors_text = (
         ", ".join(state["readable_factors"])
@@ -158,12 +190,7 @@ def validate_email_node(state: EmailState) -> dict:
     Position in graph: after generate_email; routes to END or back to generate.
     """
     try:
-        llm = ChatGroq(
-            model=settings.groq_model,
-            api_key=settings.groq_api_key,
-            temperature=0.0,  # deterministic for classification
-        )
-
+        llm = _get_groq()
         prompt = build_validation_prompt(
             recommendation=state["recommendation"],
             tone=state["tone"],

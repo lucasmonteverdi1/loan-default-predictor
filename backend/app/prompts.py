@@ -11,6 +11,11 @@ and easy to test in isolation.
 from __future__ import annotations
 
 
+def _sanitize_text(value: str, max_len: int = 100) -> str:
+    """Strip newlines and truncate to prevent prompt injection via user inputs."""
+    return value.replace("\n", " ").replace("\r", " ").strip()[:max_len]
+
+
 def build_generation_prompt(
     applicant_name: str,
     loan_amnt: float,
@@ -23,14 +28,18 @@ def build_generation_prompt(
 
     Produces a JSON object with `subject` and `body` keys.
     """
+    # Sanitize user-supplied inputs before embedding in the prompt.
+    safe_name = _sanitize_text(applicant_name)
+    safe_factors = _sanitize_text(factors_text, max_len=300)
+
     return f"""You are a professional loan officer writing a formal but empathetic email to a loan applicant.
 
-Applicant name: {applicant_name}
+Applicant name: {safe_name}
 Loan amount requested: ${loan_amnt:,.0f}
 Loan purpose: {intent_label}
 Decision: {recommendation}
 Tone: {tone}
-Key factors considered (plain language): {factors_text}
+Key factors considered (plain language): {safe_factors}
 
 Write a professional email that:
 1. Addresses the applicant by name
