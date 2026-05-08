@@ -91,14 +91,15 @@ def choose_tone(state: EmailState) -> dict:
 
 
 def _parse_json_response(raw: str) -> dict:
-    """Strip markdown fences and parse JSON from an LLM response."""
-    raw = raw.strip()
-    if raw.startswith("```"):
-        parts = raw.split("```")
-        raw = parts[1] if len(parts) > 1 else raw
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
+    """Strip markdown fences and parse JSON from an LLM response.
+
+    Handles all common fence formats:
+      - bare JSON (no fences)
+      - ```\n{...}\n```
+      - ```json\n{...}\n```
+    """
+    import re
+    raw = re.sub(r"^```[\w]*\n?", "", raw.strip()).rstrip("`").strip()
     return json.loads(raw)
 
 
@@ -156,29 +157,35 @@ def validate_email_node(state: EmailState) -> dict:
     Returns: validation_passed — True means the email is good to send.
     Position in graph: after generate_email; routes to END or back to generate.
     """
-    llm = ChatGroq(
-        model=settings.groq_model,
-        api_key=settings.groq_api_key,
-        temperature=0.0,  # deterministic for classification
-    )
-
-    prompt = build_validation_prompt(
-        recommendation=state["recommendation"],
-        tone=state["tone"],
-        top_risk_factors=state["top_risk_factors"],
-        subject=state["subject"],
-        body=state["body"],
-    )
-
-    response = llm.invoke(prompt)
     try:
+        llm = ChatGroq(
+            model=settings.groq_model,
+            api_key=settings.groq_api_key,
+            temperature=0.0,  # deterministic for classification
+        )
+
+        prompt = build_validation_prompt(
+            recommendation=state["recommendation"],
+            tone=state["tone"],
+            top_risk_factors=state["top_risk_factors"],
+            subject=state["subject"],
+            body=state["body"],
+        )
+
+        response = llm.invoke(prompt)
         result = _parse_json_response(response.content)
         passed = bool(result.get("valid", False))
         reason = result.get("reason", "")
     except (json.JSONDecodeError, ValueError, KeyError):
-        # Treat parse failure as valid to avoid infinite retry loops
+        # Parse failure: treat as valid to avoid blocking on format issues
         passed = True
         reason = "parse error — skipping validation"
+    except Exception as exc:
+        # API unavailable (rate limit, account restriction, network error, etc.)
+        # Pass validation so Gemini's output is still delivered to the user.
+        passed = True
+        reason = f"validation unavailable ({type(exc).__name__}) — skipping"
+        logger.warning("email_validation_skipped", extra={"reason": str(exc)})
 
     logger.info("email_validation", extra={"valid": passed, "reason": reason})
     return {"validation_passed": passed}
@@ -195,7 +202,7 @@ def _route_after_validation(state: EmailState) -> str:
     keeps producing invalid output. On the second failure we accept the email
     as-is rather than blocking the user.
     """
-    if not state["validation_passed"] and state.get("retries", 0) < 1:
+    if not state["validation_passed"] and state.get("retries", 0) < 2:
         return "generate_email"
     return END
 

@@ -32,7 +32,9 @@ export default function WhatIfPanel({ baseValues, baseResult }: Props) {
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset sliders when a new base prediction comes in
+  // Reset sliders when a new base prediction comes in.
+  // Also clears any pending debounce on unmount to avoid state updates on
+  // an unmounted component when the user navigates away mid-slide.
   useEffect(() => {
     setSliders({
       loan_amnt: baseValues.loan_amnt,
@@ -40,13 +42,16 @@ export default function WhatIfPanel({ baseValues, baseResult }: Props) {
       person_income: baseValues.person_income,
     });
     setResult(baseResult);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [baseResult, baseValues]);
 
   function handleSliderChange(field: keyof Sliders, value: number) {
     const next = { ...sliders, [field]: value };
     setSliders(next);
 
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
@@ -79,6 +84,8 @@ export default function WhatIfPanel({ baseValues, baseResult }: Props) {
   const delta = (result.default_probability - baseResult.default_probability) * 100;
   const deltaStr = delta > 0 ? `+${delta.toFixed(1)}%` : `${delta.toFixed(1)}%`;
   const deltaColor = delta > 0 ? "text-red-600" : delta < 0 ? "text-green-600" : "text-gray-400";
+  // Use a threshold to avoid showing "+0.0% vs original" from floating-point noise
+  const showDelta = Math.abs(delta) > 0.05;
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -136,12 +143,12 @@ export default function WhatIfPanel({ baseValues, baseResult }: Props) {
         <span
           className={`rounded-full px-3 py-1 text-sm font-semibold ${BADGE_COLOR[result.recommendation]} ${loading ? "opacity-50" : ""}`}
         >
-          {result.recommendation.replace("_", " ")}
+          {result.recommendation.replaceAll("_", " ")}
         </span>
         <span className={`text-xl font-bold text-gray-900 ${loading ? "opacity-50" : ""}`}>
           {result.default_pct}
         </span>
-        {delta !== 0 && (
+        {showDelta && (
           <span className={`text-sm font-medium ${deltaColor}`}>
             {deltaStr} vs original
           </span>

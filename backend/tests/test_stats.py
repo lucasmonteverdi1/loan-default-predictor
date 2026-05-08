@@ -62,7 +62,7 @@ def test_stats_after_predict(client):
         "person_home_ownership": "RENT", "person_emp_length": 3.0,
         "loan_intent": "PERSONAL", "loan_grade": "C",
         "loan_amnt": 10000, "loan_int_rate": 13.5,
-        "loan_percent_income": 0.18, "cb_person_default_on_file": "N",
+        "cb_person_default_on_file": "N",
         "cb_person_cred_hist_length": 4,
     }
     c.post("/predict", json=payload)

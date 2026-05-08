@@ -84,4 +84,7 @@ export const generateEmail = (data: EmailRequest): Promise<EmailResponse> =>
   apiFetch<EmailResponse>("/email", data);
 
 export const getStats = (): Promise<StatsResponse> =>
-  fetch(`${API_URL}/stats`).then((r) => r.json() as Promise<StatsResponse>);
+  fetch(`${API_URL}/stats`).then((r) => {
+    if (!r.ok) throw new Error(r.statusText);
+    return r.json() as Promise<StatsResponse>;
+  });

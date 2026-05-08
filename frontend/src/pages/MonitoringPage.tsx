@@ -110,7 +110,7 @@ export default function MonitoringPage() {
                     outerRadius={80}
                     label={({ name, percent }: { name?: string; percent?: number }) =>
                       name && percent != null
-                        ? `${name.replace("_", " ")} ${(percent * 100).toFixed(0)}%`
+                        ? `${name.replaceAll("_", " ")} ${(percent * 100).toFixed(0)}%`
                         : ""
                     }
                     labelLine={false}
@@ -123,7 +123,7 @@ export default function MonitoringPage() {
                     ))}
                   </Pie>
                   <Legend
-                    formatter={(v) => v.replace("_", " ")}
+                    formatter={(v) => v.replaceAll("_", " ")}
                     iconSize={10}
                     wrapperStyle={{ fontSize: 11 }}
                   />
