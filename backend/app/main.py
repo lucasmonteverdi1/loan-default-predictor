@@ -1,38 +1,45 @@
-from __future__ import annotations
-import logging.config
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Annotated, Any
+import logging
+import os
 
 import joblib
 import shap
-from fastapi import FastAPI
+from fastapi import Body, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.config import settings
-from app.schema import PredictRequest, PredictResponse, EmailRequest, EmailResponse
+from app.logging_config import configure_logging
+
+# LangChain/LangSmith reads tracing configuration directly from os.environ
+# (not from Pydantic Settings). We export the relevant vars here so they are
+# available regardless of how the process was started (uvicorn, docker, etc.).
+_LANGCHAIN_ENV_VARS = [
+    "LANGCHAIN_TRACING_V2",
+    "LANGSMITH_API_KEY",
+    "LANGSMITH_ENDPOINT",
+    "LANGCHAIN_PROJECT",
+]
+for _var in _LANGCHAIN_ENV_VARS:
+    _val = getattr(settings, _var.lower(), None)
+    if _val and _var not in os.environ:
+        os.environ[_var] = str(_val)
+from app.schema import (
+    EmailRequest, EmailResponse,
+    PredictRequest, PredictResponse,
+    StatsResponse,
+)
 from app.predict import predict as run_predict
 from app.email_gen import generate_email
+from app.stats_store import stats_store
 
-LOGGING_CONFIG = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "json": {
-            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
-            "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
-        }
-    },
-    "handlers": {
-        "stdout": {
-            "class": "logging.StreamHandler",
-            "stream": "ext://sys.stdout",
-            "formatter": "json",
-        }
-    },
-    "root": {"handlers": ["stdout"], "level": settings.log_level.upper()},
-}
-logging.config.dictConfig(LOGGING_CONFIG)
+configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
+
+limiter = Limiter(key_func=get_remote_address)
 
 
 class ModelState:
@@ -61,6 +68,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -74,17 +84,25 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/stats", response_model=StatsResponse)
+def stats_endpoint():
+    return stats_store.snapshot()
+
+
 @app.post("/predict", response_model=PredictResponse)
-def predict_endpoint(request: PredictRequest) -> PredictResponse:
+@limiter.limit("30/minute")
+def predict_endpoint(request: Request, body: PredictRequest = Body(...)) -> PredictResponse:
     result = run_predict(
-        request=request,
+        request=body,
         model=model_state.model,
         explainer=model_state.explainer,
         feature_names=model_state.feature_names,
     )
+    stats_store.record(result["default_probability"], result["recommendation"])
     return PredictResponse(**result)
 
 
 @app.post("/email", response_model=EmailResponse)
-def email_endpoint(request: EmailRequest) -> EmailResponse:
-    return generate_email(request)
+@limiter.limit("10/minute")
+def email_endpoint(request: Request, body: EmailRequest = Body(...)) -> EmailResponse:
+    return generate_email(body)

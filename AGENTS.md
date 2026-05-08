@@ -14,7 +14,7 @@ the top features driving the prediction.
 Built as a portfolio project — public repo, intended to demonstrate ML
 engineering skills in a CV context.
 
-**Stack:** Python · XGBoost · FastAPI · Docker · Google Cloud Run (target)
+**Stack:** Python · XGBoost · FastAPI · LangGraph · Docker · Google Cloud Run (target) · React · Vite · Recharts
 
 ---
 
@@ -238,6 +238,91 @@ Minimum required tests before any deployment:
 5. Prediction output is in [0, 1]
 
 Run with: `pytest tests/`
+
+---
+
+## Phase 2 additions
+
+### LangGraph email agent (`backend/app/email_gen.py`)
+
+The `/email` endpoint is powered by a LangGraph `StateGraph` with 4 nodes:
+
+| Node | LLM | Role |
+|---|---|---|
+| `translate_factors` | None | Converts technical SHAP names → readable labels via `feature_labels.py` |
+| `choose_tone` | None | Maps recommendation → tone style guide |
+| `generate_email` | Gemini 2.5 Flash Lite | Drafts the email |
+| `validate_email` | Groq llama-3.1-8b-instant | Classifies draft as valid/invalid; triggers 1 retry if invalid |
+
+Full architecture docs in `backend/app/EMAIL_AGENT.md`.
+Prompt templates are in `backend/app/prompts.py` — edit prompts there, not in `email_gen.py`.
+All code and comments in `email_gen.py` are in **English**.
+
+### Feature labels
+
+Human-readable labels for all 24 features live in two mirrored files:
+- `backend/app/feature_labels.py` — used by `translate_factors` node
+- `frontend/src/featureLabels.ts` — used by `ResultCard` chips
+
+**If the feature set changes, update both files.**
+
+### Stats store (`backend/app/stats_store.py`)
+
+In-memory ring buffer (last 500 predictions). Thread-safe, no persistence.
+Resets on each process restart (Cloud Run cold starts). Acceptable for demo.
+Hook called from `predict_endpoint` in `main.py`. Exposed via `GET /stats`.
+
+### Monitoring dashboard
+
+Frontend route `/monitoring`. Polls `GET /stats` every 10 seconds.
+3 charts: probability histogram (BarChart), decision distribution (PieChart), recent timeline (LineChart).
+Built with Recharts.
+
+### What-if simulator
+
+Frontend component `WhatIfPanel.tsx`. Appears below `ResultCard` after a prediction.
+3 sliders: loan amount, interest rate, % of income.
+Debounce: **500ms**. Calls `/predict` only — never regenerates the email (expensive LLM call).
+
+### Rate limiting
+
+`slowapi` with in-memory backend:
+- `/predict` — 30 req/min
+- `/email` — 10 req/min
+
+Per-instance (not globally distributed across Cloud Run replicas). Acceptable for demo.
+
+### Structured logging (`backend/app/logging_config.py`)
+
+Custom formatter adds `severity` and `timestamp` fields for Cloud Logging compatibility.
+Cloud Run auto-parses JSON stdout — no additional client library needed.
+No behavior change locally; `severity` mapping only matters on GCP.
+
+### CI (`.github/workflows/ci.yml`)
+
+Two independent jobs on push/PR to `main`:
+- `backend-tests`: Python 3.11, pip cache, `pytest tests/ -v`
+- `frontend-build`: pnpm latest, Node 22, `pnpm install --frozen-lockfile && pnpm run build`
+
+Tests do not require model files or API keys — all LLM calls and joblib loads are mocked.
+
+### Environment variables (updated)
+
+| Variable | Description | Default |
+|---|---|---|
+| `PORT` | Server port | `8080` |
+| `LOG_LEVEL` | Log level | `info` |
+| `CORS_ORIGINS` | Allowed origins | `*` |
+| `MODEL_PATH` | Path to model joblib | `../model/credit_model.joblib` |
+| `FEATURES_PATH` | Path to features joblib | `../model/features.joblib` |
+| `GEMINI_API_KEY` | Google Gemini API key | _(required)_ |
+| `GEMINI_MODEL` | Gemini model ID | `gemini-2.5-flash-lite` |
+| `GROQ_API_KEY` | Groq API key | _(required)_ |
+| `GROQ_MODEL` | Groq model ID | `llama-3.1-8b-instant` |
+
+### Package manager
+
+Frontend uses **pnpm**. Never use `npm` in this project.
 
 ---
 

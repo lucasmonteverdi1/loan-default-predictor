@@ -18,7 +18,6 @@ VALID_PAYLOAD = {
     "loan_grade": "C",
     "loan_amnt": 10000,
     "loan_int_rate": 13.5,
-    "loan_percent_income": 0.18,
     "cb_person_default_on_file": "N",
     "cb_person_cred_hist_length": 4,
 }
@@ -93,7 +92,8 @@ def test_feature_engineering_columns_and_order():
 
     row = df.iloc[0]
     assert row["person_income_log"] == pytest.approx(math.log(55000))
-    assert row["debt_to_income"] == pytest.approx(0.18)
+    # debt_to_income is now derived: loan_amnt / person_income = 10000 / 55000
+    assert row["debt_to_income"] == pytest.approx(10000 / 55000)
     assert row["annual_interest_burden"] == pytest.approx(10000 * 13.5 / 100)
     assert row["income_per_emp_year"] == pytest.approx(55000 / 3.0)
     assert row["loan_grade_encoded"] == 2  # C → 2
@@ -103,7 +103,7 @@ def test_feature_engineering_columns_and_order():
     assert row["loan_intent_EDUCATION"] == 0
     assert row["cb_person_default_on_file_Y"] == 0
     assert row["high_interest_flag"] == 0    # 13.5 <= 15
-    assert row["high_debt_burden_flag"] == 0  # 0.18 <= 0.3
+    assert row["high_debt_burden_flag"] == 0  # 10000/55000 ≈ 0.18 <= 0.3
 
 
 # 5. Prediction probability is in [0, 1]

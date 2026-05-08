@@ -28,7 +28,9 @@ def engineer_features(request, feature_names: list[str]) -> pd.DataFrame:
     p = request
 
     person_income_log = math.log(p.person_income)
-    debt_to_income = p.loan_percent_income
+    # debt_to_income is derived from the two inputs the user already provides —
+    # no need to ask for loan_percent_income as a separate field.
+    debt_to_income = p.loan_amnt / p.person_income
     annual_interest_burden = p.loan_amnt * p.loan_int_rate / 100.0
     income_per_emp_year = (
         p.person_income / p.person_emp_length

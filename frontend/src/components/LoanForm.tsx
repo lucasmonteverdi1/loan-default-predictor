@@ -20,7 +20,6 @@ const schema = z.object({
   loan_grade: z.enum(["A", "B", "C", "D", "E", "F", "G"]),
   loan_amnt: z.coerce.number().positive(),
   loan_int_rate: z.coerce.number().positive().max(100),
-  loan_percent_income: z.coerce.number().min(0).max(1),
   cb_person_default_on_file: z.enum(["Y", "N"]),
   cb_person_cred_hist_length: z.coerce.number().int().min(0),
 });
@@ -162,19 +161,6 @@ export default function LoanForm({ onSubmit, loading }: Props) {
           type="number"
           step="0.1"
           placeholder="13.5"
-          className={inputCls}
-        />
-      </Field>
-
-      <Field
-        label="Loan as % of income (0–1)"
-        error={errors.loan_percent_income?.message}
-      >
-        <input
-          {...register("loan_percent_income")}
-          type="number"
-          step="0.01"
-          placeholder="0.18"
           className={inputCls}
         />
       </Field>

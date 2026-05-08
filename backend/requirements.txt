@@ -10,5 +10,10 @@ pydantic-settings==2.8.1
 joblib==1.4.2
 python-multipart==0.0.20
 python-json-logger==3.2.1
-google-genai
+google-genai==1.72.0
+langgraph==1.1.6
+langchain-core==1.2.31
+langchain-google-genai==4.2.2
+langchain-groq==1.1.2
+slowapi==0.1.9
 pytest

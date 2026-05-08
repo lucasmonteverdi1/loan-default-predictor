@@ -21,7 +21,6 @@ export interface PredictRequest {
   loan_grade: LoanGrade;
   loan_amnt: number;
   loan_int_rate: number;
-  loan_percent_income: number;
   cb_person_default_on_file: DefaultOnFile;
   cb_person_cred_hist_length: number;
 }
@@ -46,6 +45,26 @@ export interface EmailResponse {
   body: string;
 }
 
+export interface HistogramBin {
+  bin_start: number;
+  bin_end: number;
+  count: number;
+}
+
+export interface PredictionRecord {
+  ts: string;
+  prob: number;
+  recommendation: Recommendation;
+}
+
+export interface StatsResponse {
+  total: number;        // all-time prediction count
+  recent_count: number; // predictions in the ring buffer (≤ 500)
+  recommendation_counts: Record<string, number>;
+  histogram: HistogramBin[];
+  recent: PredictionRecord[];
+}
+
 async function apiFetch<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
@@ -64,3 +83,9 @@ export const predictLoan = (data: PredictRequest): Promise<PredictResponse> =>
 
 export const generateEmail = (data: EmailRequest): Promise<EmailResponse> =>
   apiFetch<EmailResponse>("/email", data);
+
+export const getStats = (): Promise<StatsResponse> =>
+  fetch(`${API_URL}/stats`).then((r) => {
+    if (!r.ok) throw new Error(r.statusText);
+    return r.json() as Promise<StatsResponse>;
+  });
