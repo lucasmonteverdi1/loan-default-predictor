@@ -210,3 +210,6 @@ __marimo__/
 kaggle.json
 *.joblib
 .idea/
+
+# Claude Code local preview config
+.claude/

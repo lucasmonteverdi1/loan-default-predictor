@@ -140,12 +140,19 @@ docker run -p 8080:8080 \
 
 ### Backend → Cloud Run
 
+`gcloud run deploy` doesn't support a `--dockerfile` flag — it auto-detects a
+`Dockerfile` in the source root, falling back to Buildpacks if none is found.
+Since the actual Dockerfile lives in `backend/` (so it can `COPY model/` from
+the repo root), copy it to the root before deploying:
+
 ```bash
+cp backend/Dockerfile Dockerfile
+
 gcloud run deploy loan-backend \
   --source . \
-  --dockerfile backend/Dockerfile \
   --region us-central1 \
-  --set-env-vars GEMINI_API_KEY=...
+  --allow-unauthenticated \
+  --set-env-vars GEMINI_API_KEY=...,GROQ_API_KEY=...,EMAIL_DAILY_LIMIT=100,CORS_ORIGINS=https://your-project.web.app
 ```
 
 ### Frontend → Firebase Hosting
