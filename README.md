@@ -21,6 +21,7 @@ loan-default-predictor/
 ├── model/                        # Trained model artifacts (not committed)
 │   ├── credit_model.joblib
 │   └── features.joblib
+├── Dockerfile                    # Builds from repo root (needs model/ and backend/)
 ├── backend/
 │   ├── app/
 │   │   ├── main.py               # FastAPI app, routes
@@ -30,7 +31,6 @@ loan-default-predictor/
 │   │   └── config.py             # Settings from env vars
 │   ├── tests/
 │   │   └── test_predict.py
-│   ├── Dockerfile
 │   ├── requirements.txt
 │   └── .env.example
 └── frontend/
@@ -127,10 +127,11 @@ pnpm dev                      # opens http://localhost:5173
 
 ## Docker (backend)
 
-The Dockerfile is built from the repo root so it can access `model/`:
+The Dockerfile lives at the repo root (build context) so it can `COPY model/`
+and `COPY backend/`:
 
 ```bash
-docker build -f backend/Dockerfile -t loan-backend .
+docker build -t loan-backend .
 docker run -p 8080:8080 \
   -e GEMINI_API_KEY=... \
   loan-backend
@@ -140,14 +141,10 @@ docker run -p 8080:8080 \
 
 ### Backend → Cloud Run
 
-`gcloud run deploy` doesn't support a `--dockerfile` flag — it auto-detects a
-`Dockerfile` in the source root, falling back to Buildpacks if none is found.
-Since the actual Dockerfile lives in `backend/` (so it can `COPY model/` from
-the repo root), copy it to the root before deploying:
+`gcloud run deploy --source .` auto-detects the `Dockerfile` at the repo root
+(falling back to Buildpacks if none is found — there's no `--dockerfile` flag):
 
 ```bash
-cp backend/Dockerfile Dockerfile
-
 gcloud run deploy loan-backend \
   --source . \
   --region us-central1 \

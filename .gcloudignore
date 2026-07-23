@@ -1,0 +1,24 @@
+# Cloud Build upload context — unlike .gitignore, this must NOT exclude
+# *.joblib: the trained model isn't committed to git but is required in the
+# Docker build context (see Dockerfile's `COPY model/`).
+
+.git
+.gitignore
+.claude/
+
+# Frontend isn't needed to build the backend image.
+frontend/
+node_modules/
+
+# Python
+__pycache__/
+*.py[codz]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Env files (secrets are passed via --set-env-vars, not baked into the image)
+.env
+backend/.env

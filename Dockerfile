@@ -4,13 +4,13 @@ RUN useradd -m -u 1000 appuser
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# model/ se copia desde la raiz del repo (contexto: loan-default-predictor/)
+# Build context is the repo root (loan-default-predictor/) so model/ is reachable.
 COPY model/ ./model/
 
-COPY app/ ./app/
+COPY backend/app/ ./app/
 
 USER appuser
 
