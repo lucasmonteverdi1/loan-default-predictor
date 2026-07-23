@@ -10,11 +10,11 @@ network access. They verify:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.email_gen import choose_tone, translate_factors
+from app.email_gen import _is_transient, _llm_retry, choose_tone, translate_factors
 from app.schema import EmailRequest, EmailResponse
 
 
@@ -82,7 +82,7 @@ def _make_llm_response(content: str) -> MagicMock:
     return mock
 
 
-def test_generate_email_happy_path():
+async def test_generate_email_happy_path():
     """Graph runs successfully: generate node produces email, validate node passes it."""
     # Mock at node level — the graph is compiled at import time so mocking
     # the LLM classes after import has no effect. Mocking the node functions
@@ -98,14 +98,14 @@ def test_generate_email_happy_path():
     original_graph = eg._graph  # save so we can restore after test
 
     try:
-        with patch("app.email_gen.generate_email_node", return_value=fake_generate_output), \
-             patch("app.email_gen.validate_email_node", return_value=fake_validate_output), \
+        with patch("app.email_gen.generate_email_node", AsyncMock(return_value=fake_generate_output)), \
+             patch("app.email_gen.validate_email_node", AsyncMock(return_value=fake_validate_output)), \
              patch("app.email_gen.settings") as mock_settings:
             mock_settings.gemini_api_key = "fake-key"
             mock_settings.groq_api_key = "fake-groq-key"
 
             eg._graph = eg._build_graph()
-            result = eg.generate_email(EMAIL_REQUEST)
+            result = await eg.generate_email(EMAIL_REQUEST)
     finally:
         eg._graph = original_graph  # always restore, even if the test fails
 
@@ -114,34 +114,80 @@ def test_generate_email_happy_path():
     assert "Jane" in result.body
 
 
-def test_generate_email_no_api_key_returns_fallback():
+async def test_generate_email_no_api_key_returns_fallback():
     """Missing API key should return the hardcoded fallback — no LLM calls made."""
     with patch("app.email_gen.settings") as mock_settings:
         mock_settings.gemini_api_key = ""
         mock_settings.groq_api_key = ""
 
         from app.email_gen import generate_email
-        result = generate_email(EMAIL_REQUEST)
+        result = await generate_email(EMAIL_REQUEST)
 
     assert isinstance(result, EmailResponse)
     assert result.subject == "Regarding your loan application"
 
 
-def test_generate_email_llm_exception_returns_fallback():
+async def test_generate_email_llm_exception_returns_fallback():
     """If a node raises unexpectedly, the fallback email is returned (no 500)."""
     import app.email_gen as eg
     original_graph = eg._graph
 
     try:
-        with patch("app.email_gen.generate_email_node", side_effect=RuntimeError("API down")), \
+        with patch("app.email_gen.generate_email_node", AsyncMock(side_effect=RuntimeError("API down"))), \
              patch("app.email_gen.settings") as mock_settings:
             mock_settings.gemini_api_key = "fake-key"
             mock_settings.groq_api_key = "fake-groq-key"
 
             eg._graph = eg._build_graph()
-            result = eg.generate_email(EMAIL_REQUEST)
+            result = await eg.generate_email(EMAIL_REQUEST)
     finally:
         eg._graph = original_graph
 
     assert isinstance(result, EmailResponse)
     assert result.subject == "Regarding your loan application"
+
+
+# ---------------------------------------------------------------------------
+# Retry logic
+# ---------------------------------------------------------------------------
+
+class _FakeAPIError(Exception):
+    def __init__(self, status_code: int):
+        self.status_code = status_code
+
+
+def test_is_transient_503_retries():
+    assert _is_transient(_FakeAPIError(503)) is True
+
+
+def test_is_transient_400_does_not_retry():
+    assert _is_transient(_FakeAPIError(400)) is False
+
+
+async def test_llm_retry_recovers_from_transient_failure():
+    """A 503 followed by success should succeed without raising."""
+    calls = {"n": 0}
+
+    @_llm_retry
+    async def flaky():
+        calls["n"] += 1
+        if calls["n"] < 2:
+            raise _FakeAPIError(503)
+        return "ok"
+
+    assert await flaky() == "ok"
+    assert calls["n"] == 2
+
+
+async def test_llm_retry_gives_up_on_non_transient_error():
+    """A 400 should not be retried — it fails on the first attempt."""
+    calls = {"n": 0}
+
+    @_llm_retry
+    async def always_bad():
+        calls["n"] += 1
+        raise _FakeAPIError(400)
+
+    with pytest.raises(_FakeAPIError):
+        await always_bad()
+    assert calls["n"] == 1

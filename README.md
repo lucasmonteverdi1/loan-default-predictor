@@ -104,7 +104,7 @@ source .venv/bin/activate     # Windows: .venv\Scripts\activate
 
 pip install -r requirements.txt
 
-uvicorn app.main:app --reload --port 8080
+uvicorn app.main:app --reload --reload-dir app --reload-exclude '.venv/*' --port 8080
 ```
 
 

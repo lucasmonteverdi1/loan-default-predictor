@@ -13,6 +13,7 @@ from typing import TypedDict
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langgraph.graph import END, START, StateGraph
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app.config import settings
 from app.feature_labels import to_readable
@@ -41,6 +42,21 @@ def _make_groq_client() -> ChatGroq:
         api_key=settings.groq_api_key,
         temperature=0.0,
     )
+
+def _is_transient(exc: BaseException) -> bool:
+    """Retry on rate limits / server errors / network hiccups, not on bad input."""
+    status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    if status is not None:
+        return status in (429, 500, 502, 503, 504)
+    return isinstance(exc, (TimeoutError, ConnectionError))
+
+
+_llm_retry = retry(
+    retry=retry_if_exception(_is_transient),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    reraise=True,
+)
 
 # Lazy singletons: only created when both keys are present (checked in generate_email).
 _gemini_llm: ChatGoogleGenerativeAI | None = None
@@ -140,14 +156,23 @@ def _parse_json_response(raw: str) -> dict:
     return json.loads(raw)
 
 
-def generate_email_node(state: EmailState) -> dict:
+@_llm_retry
+async def _invoke_gemini(prompt: str):
+    return await _get_gemini().ainvoke(prompt)
+
+
+@_llm_retry
+async def _invoke_groq(prompt: str):
+    return await _get_groq().ainvoke(prompt)
+
+
+async def generate_email_node(state: EmailState) -> dict:
     """Call the LLM to draft the applicant email.
 
     Uses the readable factors and tone selected by upstream nodes so the
     prompt is focused. Returns subject + body as raw strings.
     Position in graph: after choose_tone; may be called again on retry.
     """
-    llm = _get_gemini()
     intent_label = _INTENT_LABELS.get(state["loan_intent"], state["loan_intent"].lower())
     factors_text = (
         ", ".join(state["readable_factors"])
@@ -164,7 +189,7 @@ def generate_email_node(state: EmailState) -> dict:
         factors_text=factors_text,
     )
 
-    response = llm.invoke(prompt)
+    response = await _invoke_gemini(prompt)
     data = _parse_json_response(response.content)
 
     return {
@@ -174,7 +199,7 @@ def generate_email_node(state: EmailState) -> dict:
     }
 
 
-def validate_email_node(state: EmailState) -> dict:
+async def validate_email_node(state: EmailState) -> dict:
     """Ask Groq (llama-3.1-8b-instant) to self-check the generated email.
 
     Uses Groq instead of Gemini because validation is a classification task —
@@ -190,7 +215,6 @@ def validate_email_node(state: EmailState) -> dict:
     Position in graph: after generate_email; routes to END or back to generate.
     """
     try:
-        llm = _get_groq()
         prompt = build_validation_prompt(
             recommendation=state["recommendation"],
             tone=state["tone"],
@@ -199,7 +223,7 @@ def validate_email_node(state: EmailState) -> dict:
             body=state["body"],
         )
 
-        response = llm.invoke(prompt)
+        response = await _invoke_groq(prompt)
         result = _parse_json_response(response.content)
         passed = bool(result.get("valid", False))
         reason = result.get("reason", "")
@@ -284,7 +308,7 @@ _FALLBACK_EMAIL = EmailResponse(
 )
 
 
-def generate_email(request: EmailRequest) -> EmailResponse:
+async def generate_email(request: EmailRequest) -> EmailResponse:
     """Run the LangGraph email agent and return a structured email.
 
     Falls back to a generic template if the API key is missing or the graph
@@ -309,7 +333,7 @@ def generate_email(request: EmailRequest) -> EmailResponse:
     }
 
     try:
-        final_state = _graph.invoke(initial_state)  # type: ignore[arg-type]
+        final_state = await _graph.ainvoke(initial_state)  # type: ignore[arg-type]
         logger.info("email_generated", extra={"recommendation": request.recommendation})
         return EmailResponse(
             subject=final_state["subject"],

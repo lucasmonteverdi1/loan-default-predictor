@@ -104,5 +104,5 @@ def predict_endpoint(request: Request, body: PredictRequest = Body(...)) -> Pred
 
 @app.post("/email", response_model=EmailResponse)
 @limiter.limit("10/minute")
-def email_endpoint(request: Request, body: EmailRequest = Body(...)) -> EmailResponse:
-    return generate_email(body)
+async def email_endpoint(request: Request, body: EmailRequest = Body(...)) -> EmailResponse:
+    return await generate_email(body)
