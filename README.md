@@ -2,6 +2,8 @@
 
 End-to-end credit risk scoring system. A trained XGBoost model evaluates loan applications and returns a default probability, a risk recommendation, the top contributing factors, and an AI-generated email draft for the applicant.
 
+Link to the app: https://loan-default-predictor-503315.web.app/
+
 Link to Google Colab with dataset cleaning and model training: https://colab.research.google.com/drive/19mi4wfKCh3tbsXAAagRCqEjxuYy_NTNM?usp=sharing
 
 ## Architecture
