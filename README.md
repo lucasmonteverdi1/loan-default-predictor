@@ -21,6 +21,7 @@ loan-default-predictor/
 ├── model/                        # Trained model artifacts (not committed)
 │   ├── credit_model.joblib
 │   └── features.joblib
+├── Dockerfile                    # Builds from repo root (needs model/ and backend/)
 ├── backend/
 │   ├── app/
 │   │   ├── main.py               # FastAPI app, routes
@@ -30,7 +31,6 @@ loan-default-predictor/
 │   │   └── config.py             # Settings from env vars
 │   ├── tests/
 │   │   └── test_predict.py
-│   ├── Dockerfile
 │   ├── requirements.txt
 │   └── .env.example
 └── frontend/
@@ -104,7 +104,7 @@ source .venv/bin/activate     # Windows: .venv\Scripts\activate
 
 pip install -r requirements.txt
 
-uvicorn app.main:app --reload --port 8080
+uvicorn app.main:app --reload --reload-dir app --reload-exclude '.venv/*' --port 8080
 ```
 
 
@@ -127,10 +127,11 @@ pnpm dev                      # opens http://localhost:5173
 
 ## Docker (backend)
 
-The Dockerfile is built from the repo root so it can access `model/`:
+The Dockerfile lives at the repo root (build context) so it can `COPY model/`
+and `COPY backend/`:
 
 ```bash
-docker build -f backend/Dockerfile -t loan-backend .
+docker build -t loan-backend .
 docker run -p 8080:8080 \
   -e GEMINI_API_KEY=... \
   loan-backend
@@ -140,12 +141,15 @@ docker run -p 8080:8080 \
 
 ### Backend → Cloud Run
 
+`gcloud run deploy --source .` auto-detects the `Dockerfile` at the repo root
+(falling back to Buildpacks if none is found — there's no `--dockerfile` flag):
+
 ```bash
 gcloud run deploy loan-backend \
   --source . \
-  --dockerfile backend/Dockerfile \
   --region us-central1 \
-  --set-env-vars GEMINI_API_KEY=...
+  --allow-unauthenticated \
+  --set-env-vars GEMINI_API_KEY=...,GROQ_API_KEY=...,EMAIL_DAILY_LIMIT=100,CORS_ORIGINS=https://your-project.web.app
 ```
 
 ### Frontend → Firebase Hosting

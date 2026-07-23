@@ -18,7 +18,17 @@ export default function Layout() {
             <h1 className="text-lg font-bold text-gray-900 leading-tight">
               Credit Risk Scorer
             </h1>
-            <p className="text-xs text-gray-400">XGBoost · SHAP · Gemini · Groq · LangGraph</p>
+            <p className="text-xs text-gray-400">
+              XGBoost · SHAP · Gemini · Groq · LangGraph ·{" "}
+              <a
+                href="https://colab.research.google.com/drive/19mi4wfKCh3tbsXAAagRCqEjxuYy_NTNM?usp=sharing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-gray-600"
+              >
+                model training notebook
+              </a>
+            </p>
           </div>
           <nav className="flex gap-2">
             <NavLink to="/" end className={navCls}>

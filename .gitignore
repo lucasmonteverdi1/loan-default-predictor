@@ -136,6 +136,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.production
 .envrc
 .venv
 env/
@@ -143,6 +144,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Firebase CLI local cache
+.firebase/
 
 # Spyder project settings
 .spyderproject
@@ -210,3 +214,6 @@ __marimo__/
 kaggle.json
 *.joblib
 .idea/
+
+# Claude Code local preview config
+.claude/

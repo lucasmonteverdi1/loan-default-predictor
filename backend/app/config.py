@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     groq_api_key: str = Field(default="")
     groq_model: str = Field(default="llama-3.1-8b-instant")
 
+    email_daily_limit: int = Field(default=100)
+
     # LangSmith tracing — read from .env and forwarded to os.environ in main.py
     langchain_tracing_v2: str = Field(default="")
     langsmith_api_key: str = Field(default="")

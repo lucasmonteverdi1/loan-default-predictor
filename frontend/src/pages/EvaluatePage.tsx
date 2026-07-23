@@ -1,5 +1,6 @@
 import { useState } from "react";
 import LoanForm, { type FormValues } from "../components/LoanForm";
+import FieldHelpCard from "../components/FieldHelpCard";
 import ResultCard from "../components/ResultCard";
 import WhatIfPanel from "../components/WhatIfPanel";
 import { predictLoan, generateEmail, type PredictResponse, type EmailResponse } from "../api";
@@ -11,6 +12,7 @@ export default function EvaluatePage() {
   const [email, setEmail] = useState<EmailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<FormValues | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   async function handleSubmit(values: FormValues) {
     setError(null);
@@ -44,10 +46,18 @@ export default function EvaluatePage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
-      {/* Form card */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <LoanForm onSubmit={handleSubmit} loading={predicting} />
+    <div className={`flex flex-col gap-6 mx-auto ${helpOpen ? "max-w-4xl" : "max-w-2xl"}`}>
+      {/* Form card + help card */}
+      <div className={helpOpen ? "grid grid-cols-1 gap-6 md:grid-cols-2 md:items-start" : ""}>
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <LoanForm
+            onSubmit={handleSubmit}
+            loading={predicting}
+            helpOpen={helpOpen}
+            onToggleHelp={() => setHelpOpen((v) => !v)}
+          />
+        </div>
+        {helpOpen && <FieldHelpCard onClose={() => setHelpOpen(false)} />}
       </div>
 
       {/* Error */}
