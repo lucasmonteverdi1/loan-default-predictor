@@ -5,13 +5,14 @@ import os
 
 import joblib
 import shap
-from fastapi import Body, FastAPI, Request
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app.config import settings
+from app.daily_limiter import DailyLimiter
 from app.logging_config import configure_logging
 
 # LangChain/LangSmith reads tracing configuration directly from os.environ
@@ -40,6 +41,7 @@ configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 
 limiter = Limiter(key_func=get_remote_address)
+email_daily_limiter = DailyLimiter(settings.email_daily_limit)
 
 
 class ModelState:
@@ -90,7 +92,7 @@ def stats_endpoint():
 
 
 @app.post("/predict", response_model=PredictResponse)
-@limiter.limit("30/minute")
+@limiter.limit("10/minute")
 def predict_endpoint(request: Request, body: PredictRequest = Body(...)) -> PredictResponse:
     result = run_predict(
         request=body,
@@ -103,6 +105,8 @@ def predict_endpoint(request: Request, body: PredictRequest = Body(...)) -> Pred
 
 
 @app.post("/email", response_model=EmailResponse)
-@limiter.limit("10/minute")
+@limiter.limit("5/minute")
 async def email_endpoint(request: Request, body: EmailRequest = Body(...)) -> EmailResponse:
+    if not email_daily_limiter.try_consume():
+        raise HTTPException(status_code=429, detail="Daily email generation limit reached — try again tomorrow.")
     return await generate_email(body)
