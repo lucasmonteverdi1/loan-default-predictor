@@ -29,6 +29,8 @@ export type FormValues = z.infer<typeof schema>;
 interface Props {
   onSubmit: (data: FormValues) => void;
   loading: boolean;
+  helpOpen: boolean;
+  onToggleHelp: () => void;
 }
 
 function Field({
@@ -53,7 +55,7 @@ const inputCls =
   "rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
 const selectCls = inputCls;
 
-export default function LoanForm({ onSubmit, loading }: Props) {
+export default function LoanForm({ onSubmit, loading, helpOpen, onToggleHelp }: Props) {
   const {
     register,
     handleSubmit,
@@ -65,6 +67,24 @@ export default function LoanForm({ onSubmit, loading }: Props) {
       onSubmit={handleSubmit(onSubmit)}
       className="grid grid-cols-1 gap-4 sm:grid-cols-2"
     >
+      <div className="sm:col-span-2 flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-900">Loan application</h2>
+        <button
+          type="button"
+          onClick={onToggleHelp}
+          aria-label="Toggle field descriptions"
+          aria-pressed={helpOpen}
+          className={[
+            "flex h-9 w-9 items-center justify-center rounded-full border text-base font-semibold transition-colors",
+            helpOpen
+              ? "border-indigo-600 bg-indigo-600 text-white"
+              : "border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-gray-700",
+          ].join(" ")}
+        >
+          i
+        </button>
+      </div>
+
       {/* Applicant name — used for email generation only */}
       <div className="sm:col-span-2">
         <Field label="Applicant name" error={errors.applicant_name?.message}>

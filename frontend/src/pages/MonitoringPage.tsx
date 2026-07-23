@@ -32,8 +32,11 @@ export default function MonitoringPage() {
   }
 
   useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, POLL_INTERVAL_MS);
+    const poll = () => {
+      fetchStats().catch(() => {});
+    };
+    const interval = setInterval(poll, POLL_INTERVAL_MS);
+    poll();
     return () => clearInterval(interval);
   }, []);
 
